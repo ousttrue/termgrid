@@ -3,6 +3,7 @@
 #include <string_view>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <asio.hpp>
 
 extern "C" int tgetent(const char *, const char *);
@@ -260,7 +261,22 @@ public:
     {
         // clear
         tputs(m_entry->cl.c_str(), 1, putchar);
+
+        auto cols = m_entry->columns();
+        auto lines = m_entry->lines();
+
+        std::stringstream ss;
+        ss << "lines x cols = " << lines << " x " << cols;
+        auto s = ss.str();
+        auto width = s.size();
+        if (cols >= width)
+        {
+            auto mergin = (cols - width) / 2;
+            m_entry->cursor_xy(mergin, lines/2);
+            std::cout << s;
+        }
         m_entry->cursor_xy(m_col, m_line);
+
         std::cout.flush();
     }
 
@@ -321,9 +337,15 @@ public:
             m_line = lines - 2;
         }
 
-        // m_entry->cursor_save();
         m_entry->cursor_xy(0, lines - 1);
         std::cout << "key: " << (char)c;
+
+        std::stringstream ss;
+        ss << "    " << m_line << ", " << m_col;
+        auto s = ss.str();
+        m_entry->cursor_xy(cols-s.size(), lines-1);
+        std::cout << s;
+
         m_entry->cursor_xy(m_col, m_line);
         std::cout.flush();
 
