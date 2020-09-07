@@ -1,3 +1,6 @@
 [submodule "_external/asio"]
 	path = _external/asio
 	url = https://github.com/chriskohlhoff/asio.git
+[submodule "_external/char8"]
+	path = _external/char8
+	url = https://github.com/ousttrue/char8.git
