@@ -272,7 +272,7 @@ public:
         if (cols >= width)
         {
             auto mergin = (cols - width) / 2;
-            m_entry->cursor_xy(mergin, lines/2);
+            m_entry->cursor_xy(mergin, lines / 2);
             std::cout << s;
         }
         m_entry->cursor_xy(m_col, m_line);
@@ -338,12 +338,12 @@ public:
         }
 
         m_entry->cursor_xy(0, lines - 1);
-        std::cout << "key: " << (char)c;
+        std::cout << "key: 0x" << std::hex << c << "(" << (char)c << ")" << "      ";
 
         std::stringstream ss;
         ss << "    " << m_line << ", " << m_col;
         auto s = ss.str();
-        m_entry->cursor_xy(cols-s.size(), lines-1);
+        m_entry->cursor_xy(cols - s.size(), lines - 1);
         std::cout << s;
 
         m_entry->cursor_xy(m_col, m_line);
