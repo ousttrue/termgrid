@@ -11,6 +11,7 @@ struct TermcapEntry
     TermcapEntry &operator=(const TermcapEntry &) = delete;
 
     void clear();
+    void clear_to_eol();
     int lines() const;
     int columns() const;
     void cursor_xy(int col, int line);

@@ -122,6 +122,11 @@ void TermcapEntry::clear()
     tputs(m_impl->cl.c_str(), 1, putchar);
 }
 
+void TermcapEntry::clear_to_eol()
+{
+    tputs(m_impl->ce.c_str(), 1, putchar);
+}
+
 int TermcapEntry::lines() const
 {
     return tgetnum("li");

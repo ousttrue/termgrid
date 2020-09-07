@@ -12,6 +12,8 @@
 using DispatchFunc = std::function<bool(int c)>;
 using TermcapEntryPtr = std::shared_ptr<TermcapEntry>;
 
+#include "../../_external/wcwidth-cjk/wcwidth.c"
+
 class Asio
 {
     asio::io_context context;
@@ -102,6 +104,30 @@ struct TermRect
     int height;
 };
 
+static bool replace_space(char32_t unicode)
+{
+    if (unicode <= 0x7F)
+    {
+        if (unicode == 0)
+        {
+            return true;
+        }
+        if (isspace(unicode))
+        {
+            return true;
+        }
+        if (iscntrl(unicode))
+        {
+            return true;
+        }
+    }
+    else if (unicode <= 0x9F)
+    {
+        return true;
+    }
+    return false;
+}
+
 class UnicodeGrid
 {
     //      0 1 2 ... D E F
@@ -119,20 +145,24 @@ public:
         auto l = from.y << 4;
         for (int y = 0; y < dst.height; ++y, l += 16)
         {
+            if (l > 0xFFFF)
+            {
+                break;
+            }
             entry->cursor_xy(dst.left, dst.top + y);
-            std::cout << "U+" << std::hex << std::setw(4) << std::setfill('0') << l << " ";
+            std::cout << "U+" << std::hex << std::setw(4) << std::setfill('0')
+                      << l << "│";
 
             auto x = 7;
             for (int i = 0; i < 16; ++i)
             {
                 char32_t unicode = l + i;
-                if (unicode == 0)
+                if (replace_space(unicode))
                 {
-                    // space
                     unicode = 0x20;
                 }
 
-                auto w = wcwidth(unicode);
+                auto w = wcwidth_cjk(unicode);
                 if ((x + w) >= dst.width)
                 {
                     // eol
@@ -140,14 +170,13 @@ public:
                 }
 
                 auto cp = c8::utf8::from_unicode(unicode);
-                std::cout.write((const char *)cp.data(), cp.codeunit_count());
                 switch (w)
                 {
                 case -1:
-                {
-                    std::cout << ' ';
-                    break;
-                }
+                // {
+                //     std::cout << ' ';
+                //     break;
+                // }
                 case 0:
                 {
                     std::cout << "  ";
@@ -166,8 +195,11 @@ public:
                     assert(false);
                     break;
                 }
-                x+=2;
+                std::cout.write((const char *)cp.data(), cp.codeunit_count());
+                std::cout << "│";
+                x += 3;
             }
+            entry->clear_to_eol();
         }
     }
 
@@ -213,6 +245,7 @@ public:
             return false;
         }
 
+        auto lines = m_entry->lines();
         switch (c)
         {
         case 'j':
@@ -222,8 +255,24 @@ public:
         case 'k':
             --m_line;
             break;
+
+        case ' ':
+            m_line += lines;
+            break;
+
+        case 'b':
+            m_line -= lines;
+            break;
+
+        case 'g':
+            m_line = 0;
+            break;
+
+        case 'G':
+            m_line = 0xFFFF;
+            break;
         }
-        m_line = std::clamp(m_line, 0, 4096 - 16);
+        m_line = std::clamp(m_line, 0, 4096 - lines);
 
         m_grid->Render(m_entry, {0, m_line});
 
