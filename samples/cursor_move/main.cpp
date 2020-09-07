@@ -2,8 +2,8 @@
 // #include <string_view>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include <asio.hpp>
-
 #include <rawmode.h>
 #include <termcap_entry.h>
 
@@ -157,25 +157,12 @@ public:
             break;
         }
 
-        if (m_col < 0)
-        {
-            m_col = 0;
-        }
-        else if (m_col >= cols)
-        {
-            m_col = cols - 1;
-        }
-        if (m_line < 0)
-        {
-            m_line = 0;
-        }
-        else if (m_line >= lines - 1)
-        {
-            m_line = lines - 2;
-        }
+        m_col = std::clamp(m_col, 0, cols - 1);
+        m_line = std::clamp(m_line, 0, lines - 2);
 
         m_entry->cursor_xy(0, lines - 1);
-        std::cout << "key: 0x" << std::hex << c << "(" << (char)c << ")" << "      ";
+        std::cout << "key: 0x" << std::hex << c << "(" << (char)c << ")"
+                  << "      ";
 
         std::stringstream ss;
         ss << "    " << m_line << ", " << m_col;

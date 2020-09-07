@@ -23,6 +23,26 @@
                 }
             ],
             "miDebuggerPath": "/usr/bin/gdb"
-        }
-    ]
+        },
+        {
+          "name": "samples/unicode_view",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/build/samples/unicode_view/unicode_view",
+          "args": [],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb"
+      }
+  ]
 }
