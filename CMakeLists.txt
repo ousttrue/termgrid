@@ -12,13 +12,7 @@ INTERFACE
     pthread
 )
 
-add_executable(termgrid)
-target_sources(termgrid
-PRIVATE
-    main.cpp
-)
-target_link_libraries(termgrid
-PRIVATE
-    ncurses
-    asio
+subdirs(
+    termgrid
+    samples/cursor_move
 )

@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "g++ - Build and debug active file",
+            "name": "samples/cursor_move",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/termgrid",
+            "program": "${workspaceFolder}/build/samples/cursor_move/cursor_move",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

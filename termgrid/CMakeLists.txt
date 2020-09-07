@@ -1,0 +1,14 @@
+add_library(termgrid)
+target_sources(termgrid
+PRIVATE
+    termcap_entry.cpp
+    rawmode.cpp
+)
+target_include_directories(termgrid
+PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}
+)
+target_link_libraries(termgrid
+PUBLIC
+    ncurses
+)
