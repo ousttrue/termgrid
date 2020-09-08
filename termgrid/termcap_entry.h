@@ -17,4 +17,5 @@ struct TermcapEntry
     void cursor_xy(int col, int line);
     void cursor_save();
     void cursor_restore();
+    void standout(bool enable);
 };

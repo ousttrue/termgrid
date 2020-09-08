@@ -128,6 +128,40 @@ static bool replace_space(char32_t unicode)
     return false;
 }
 
+static int get_cols(c8::unicode::UnicodeBlock &block, char32_t unicode)
+{
+    switch ((c8::unicode::UnicodeBlocks)block.front)
+    {
+    case c8::unicode::UnicodeBlocks::BASIC_LATIN:
+    case c8::unicode::UnicodeBlocks::LATIN_1_SUPPLEMENT:
+    case c8::unicode::UnicodeBlocks::LATIN_EXTENDED_A:
+    case c8::unicode::UnicodeBlocks::LATIN_EXTENDED_B:
+    case c8::unicode::UnicodeBlocks::IPA_EXTENSIONS:
+    case c8::unicode::UnicodeBlocks::SPACING_MODIFIER_LETTERS:
+    case c8::unicode::UnicodeBlocks::GREEK_AND_COPTIC:
+    case c8::unicode::UnicodeBlocks::CYRILLIC:
+    case c8::unicode::UnicodeBlocks::CYRILLIC_SUPPLEMENT:
+    case c8::unicode::UnicodeBlocks::ENCLOSED_ALPHANUMERICS:
+    case c8::unicode::UnicodeBlocks::BOX_DRAWING:
+    case c8::unicode::UnicodeBlocks::GEOMETRIC_SHAPES:
+    case c8::unicode::UnicodeBlocks::MISCELLANEOUS_SYMBOLS:
+    case c8::unicode::UnicodeBlocks::DINGBATS:
+    case c8::unicode::UnicodeBlocks::COPTIC:
+    case c8::unicode::UnicodeBlocks::PRIVATE_USE_AREA:
+        return 1;
+
+    case c8::unicode::UnicodeBlocks::TRANSPORT_AND_MAP_SYMBOLS:
+    case c8::unicode::UnicodeBlocks::MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS:
+    case c8::unicode::UnicodeBlocks::EMOTICONS:
+    case c8::unicode::UnicodeBlocks::SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A:
+    case c8::unicode::UnicodeBlocks::SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS:
+        return 2;
+    }
+
+    auto w = wcwidth_cjk(unicode);
+    return w;
+}
+
 class UnicodeGrid
 {
     //      0 1 2 ... D E F
@@ -139,30 +173,35 @@ public:
     {
     }
 
-    void RenderBlit(const TermcapEntryPtr &entry, const TermCell &from,
-                    const TermRect &dst)
+    void RenderBlit(const TermcapEntryPtr &entry, char32_t plane,
+                    const TermCell &from, const TermRect &dst)
     {
-        auto l = from.y << 4;
+        plane = plane << 16;
+        char32_t l = from.y << 4;
         for (int y = 0; y < dst.height; ++y, l += 16)
         {
             if (l > 0xFFFF)
             {
                 break;
             }
+            auto line_unicode = plane | l;
             entry->cursor_xy(dst.left, dst.top + y);
-            std::cout << "U+" << std::hex << std::setw(4) << std::setfill('0')
-                      << l << "│";
+            std::cout
+                /*<< "U+"*/
+                << std::hex << std::setw(4) << std::setfill('0') << l << "│";
+
+            auto block = c8::unicode::get_block(line_unicode);
 
             auto x = 7;
             for (int i = 0; i < 16; ++i)
             {
-                char32_t unicode = l + i;
+                char32_t unicode = line_unicode + i;
                 if (replace_space(unicode))
                 {
                     unicode = 0x20;
                 }
 
-                auto w = wcwidth_cjk(unicode);
+                auto w = get_cols(block, unicode);
                 if ((x + w) >= dst.width)
                 {
                     // eol
@@ -199,15 +238,22 @@ public:
                 std::cout << "│";
                 x += 3;
             }
+
+            auto it = block.name.begin();
+            for (; x < dst.width && it != block.name.end(); ++x, ++it)
+            {
+                std::cout << *it;
+            }
+
             entry->clear_to_eol();
         }
     }
 
-    void Render(const TermcapEntryPtr &entry, const TermCell &from)
+    void Render(const TermcapEntryPtr &entry, int plane, const TermCell &from)
     {
         auto cols = entry->columns();
         auto lines = entry->lines();
-        RenderBlit(entry, from, {0, 0, cols, lines});
+        RenderBlit(entry, plane, from, {0, 1, cols, lines - 2});
     }
 };
 using UnicodeGridPtr = std::shared_ptr<UnicodeGrid>;
@@ -217,35 +263,59 @@ class UnicodeView
     TermcapEntryPtr m_entry;
     UnicodeGridPtr m_grid;
 
+    int m_plane = 0;
     int m_line = 0;
+    int m_lines = 0;
 
 public:
     UnicodeView(const TermcapEntryPtr &entry)
         : m_entry(entry), m_grid(new UnicodeGrid)
     {
-        // clear
-        m_entry->clear();
-        m_grid->Render(m_entry, {0, m_line});
-        m_entry->cursor_xy(0, 0);
-        std::cout.flush();
+        m_lines = m_entry->lines();
+        Draw();
     }
 
     ~UnicodeView()
     {
         // move
-        auto lines = m_entry->lines();
-        m_entry->cursor_xy(0, lines - 1);
+        m_entry->cursor_xy(0, m_lines - 1);
+        std::cout.flush();
+    }
+
+    void Draw(int c = 0)
+    {
+        m_grid->Render(m_entry, m_plane, {0, m_line});
+
+        {
+            m_entry->cursor_xy(0, 0);
+            m_entry->standout(true);
+            std::cout << "    │00│01│02│03│04│05│06│07│08│09│0a│0b│0c│0d│0e│0f│"
+                      << "Unicode PLANE: " << m_plane;
+            m_entry->clear_to_eol();
+            m_entry->standout(false);
+        }
+
+        if (c)
+        {
+            m_entry->standout(true);
+            m_entry->cursor_xy(0, m_lines - 1);
+            std::cout << "key: 0x" << std::hex << c << "(" << (char)c << ")";
+            m_entry->clear_to_eol();
+            m_entry->standout(false);
+        }
+
+        m_entry->cursor_xy(0, 0);
         std::cout.flush();
     }
 
     bool Dispatch(int c)
     {
-        if (c == 'q')
+        if (c == 'q' || c == 0x1b)
         {
             return false;
         }
 
-        auto lines = m_entry->lines();
+        m_lines = m_entry->lines();
         switch (c)
         {
         case 'j':
@@ -257,11 +327,11 @@ public:
             break;
 
         case ' ':
-            m_line += lines;
+            m_line += m_lines;
             break;
 
         case 'b':
-            m_line -= lines;
+            m_line -= m_lines;
             break;
 
         case 'g':
@@ -271,23 +341,19 @@ public:
         case 'G':
             m_line = 0xFFFF;
             break;
+
+        case ',':
+            --m_plane;
+            break;
+
+        case '.':
+            ++m_plane;
+            break;
         }
-        m_line = std::clamp(m_line, 0, 4096 - lines);
+        m_line = std::clamp(m_line, 0, 4096 - m_lines);
+        m_plane = std::clamp(m_plane, 0, (int)c8::unicode::UnicodePlanes::_End);
 
-        m_grid->Render(m_entry, {0, m_line});
-
-        // m_entry->cursor_xy(0, lines - 1);
-        // std::cout << "key: 0x" << std::hex << c << "(" << (char)c << ")"
-        //           << "      ";
-
-        // std::stringstream ss;
-        // ss << "    " << m_line << ", " << m_col;
-        // auto s = ss.str();
-        // m_entry->cursor_xy(cols - s.size(), lines - 1);
-        // std::cout << s;
-
-        m_entry->cursor_xy(0, 0);
-        std::cout.flush();
+        Draw(c);
 
         return true;
     }

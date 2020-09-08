@@ -152,3 +152,15 @@ void TermcapEntry::cursor_restore()
 {
     tputs(m_impl->rc.c_str(), 1, putchar);
 }
+
+void TermcapEntry::standout(bool enable)
+{
+    if (enable)
+    {
+        tputs(m_impl->so.c_str(), 1, putchar);
+    }
+    else
+    {
+        tputs(m_impl->se.c_str(), 1, putchar);
+    }
+}
