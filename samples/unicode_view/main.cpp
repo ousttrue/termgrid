@@ -209,6 +209,7 @@ public:
                 }
 
                 auto cp = c8::utf8::from_unicode(unicode);
+                std::cout.write((const char *)cp.data(), cp.codeunit_count());
                 switch (w)
                 {
                 case -1:
@@ -234,7 +235,6 @@ public:
                     assert(false);
                     break;
                 }
-                std::cout.write((const char *)cp.data(), cp.codeunit_count());
                 std::cout << "│";
                 x += 3;
             }
@@ -248,13 +248,6 @@ public:
             entry->clear_to_eol();
         }
     }
-
-    void Render(const TermcapEntryPtr &entry, int plane, const TermCell &from)
-    {
-        auto cols = entry->columns();
-        auto lines = entry->lines();
-        RenderBlit(entry, plane, from, {0, 1, cols, lines - 2});
-    }
 };
 using UnicodeGridPtr = std::shared_ptr<UnicodeGrid>;
 
@@ -263,14 +256,26 @@ class UnicodeView
     TermcapEntryPtr m_entry;
     UnicodeGridPtr m_grid;
 
+    // unicode plane: 0..0x10
     int m_plane = 0;
-    int m_line = 0;
+
+    // term size
+    int m_cols = 0;
     int m_lines = 0;
+
+    // 0..(4095 - lines)
+    int m_topline = 0;
+
+    // cursor x: 0..16
+    int m_col = 0;
+    // cursor y: 0..(lines-2)
+    int m_line = 0;
 
 public:
     UnicodeView(const TermcapEntryPtr &entry)
         : m_entry(entry), m_grid(new UnicodeGrid)
     {
+        m_cols = m_entry->columns();
         m_lines = m_entry->lines();
         Draw();
     }
@@ -284,7 +289,8 @@ public:
 
     void Draw(int c = 0)
     {
-        m_grid->Render(m_entry, m_plane, {0, m_line});
+        m_grid->RenderBlit(m_entry, m_plane, {0, m_topline},
+                           {0, 1, m_cols, m_lines - 2});
 
         {
             m_entry->cursor_xy(0, 0);
@@ -304,7 +310,7 @@ public:
             m_entry->standout(false);
         }
 
-        m_entry->cursor_xy(0, 0);
+        m_entry->cursor_xy(5 + m_col * 3, m_line + 1);
         std::cout.flush();
     }
 
@@ -315,9 +321,19 @@ public:
             return false;
         }
 
+        m_cols = m_entry->columns();
         m_lines = m_entry->lines();
+        auto height = m_lines - 2;
         switch (c)
         {
+        case 'h':
+            --m_col;
+            break;
+
+        case 'l':
+            ++m_col;
+            break;
+
         case 'j':
             ++m_line;
             break;
@@ -326,20 +342,28 @@ public:
             --m_line;
             break;
 
+        case 'J':
+            ++m_topline;
+            break;
+
+        case 'K':
+            --m_topline;
+            break;
+
         case ' ':
-            m_line += m_lines;
+            m_topline += height;
             break;
 
         case 'b':
-            m_line -= m_lines;
+            m_topline -= height;
             break;
 
         case 'g':
-            m_line = 0;
+            m_topline = 0;
             break;
 
         case 'G':
-            m_line = 0xFFFF;
+            m_topline = 0xFFFF;
             break;
 
         case ',':
@@ -350,8 +374,21 @@ public:
             ++m_plane;
             break;
         }
-        m_line = std::clamp(m_line, 0, 4096 - m_lines);
-        m_plane = std::clamp(m_plane, 0, (int)c8::unicode::UnicodePlanes::_End);
+
+        if (m_line < 0)
+        {
+            m_topline += m_line;
+            m_line = 0;
+        }
+        else if (m_line >= height)
+        {
+            m_topline += (height + 1 - m_line);
+            m_line = height - 1;
+        }
+        m_col = std::clamp(m_col, 0, 16 - 1);
+        m_topline = std::clamp(m_topline, 0, 4096 - height - 1);
+        m_plane =
+            std::clamp(m_plane, 0, (int)c8::unicode::UnicodePlanes::SPUA_B);
 
         Draw(c);
 
