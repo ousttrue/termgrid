@@ -7,3 +7,6 @@
 [submodule "_external/wcwidth-cjk"]
 	path = _external/wcwidth-cjk
 	url = https://github.com/fumiyas/wcwidth-cjk.git
+[submodule "_external/fmt"]
+	path = _external/fmt
+	url = https://github.com/fmtlib/fmt.git
