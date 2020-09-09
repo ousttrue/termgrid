@@ -15,6 +15,13 @@ INTERFACE
     pthread
 )
 
+# span
+add_library(span INTERFACE)
+target_include_directories(span
+INTERFACE
+    ${EXTERNAL_DIR}/span/include
+)
+
 # char8
 add_library(char8 INTERFACE)
 target_include_directories(char8

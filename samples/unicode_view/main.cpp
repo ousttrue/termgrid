@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <rawmode.h>
 #include <termcap_entry.h>
+#include <fmt/core.h>
+#include <tcb/span.hpp>
 
 using DispatchFunc = std::function<bool(int c)>;
 using TermcapEntryPtr = std::shared_ptr<TermcapEntry>;
@@ -90,10 +92,16 @@ public:
     }
 };
 
-struct TermCell
+struct TermPoint
 {
     int x;
     int y;
+};
+
+struct TermSize
+{
+    int width;
+    int height;
 };
 
 struct TermRect
@@ -162,22 +170,191 @@ static int get_cols(c8::unicode::UnicodeBlock &block, char32_t unicode)
     return w;
 }
 
+enum class TermColorTypes : uint8_t
+{
+    Ansi,
+    Color256,
+    Color24bit,
+};
+
+struct TermColor
+{
+    uint8_t r; // Color8 or Color256 or Color24bit red
+    uint8_t g;
+    uint8_t b;
+    TermColorTypes type;
+};
+static_assert(sizeof(TermColor) == 4, "TermColor.sizeof");
+
+/// TermCell にしようと思っていたが可変長になって表現できなかった
+///
+/// 1コードポイントで1cel: 半角文字
+/// 1コードポイントで2cel: 全角文字
+/// 1コードポイントで8cel: tab
+/// 2コードポイントで2cel: 漢字の異字体セレクタ
+/// 2コードポイントで2cel: 合字。濁点、半濁点を合成するやつ
+/// 2コードポイントで1cel: 合字。ウムラウトアクサンで合成するやつありそう
+/// Nコードポイントで2cel: 絵文字合成
+///
+/// span<TermCodepoint> で１文字(1Glyph、1 or 2
+/// columns)を表現する必要がありそう。 grapheme cluster
+///
+struct TermCodepoint
+{
+    // utf8 encoding codepoint
+    c8::utf8::codepoint cp;
+    /// 合字は最後のコードポイントで >0 にする
+    int cols;
+    /// standout, underline など Terminal のエフェクト
+    int flags;
+    TermColor fgcolor;
+    TermColor bgcolor;
+};
+
+struct TermLine
+{
+    std::vector<TermCodepoint> codes;
+
+    void clear()
+    {
+        codes.clear();
+    }
+
+    void push(const char8_t *utf8, int size = -1)
+    {
+        if (size < 0)
+        {
+            size = 0;
+            for (auto p = utf8; *p; ++p)
+            {
+                ++size;
+            }
+        }
+
+        for (int i = 0; i < size;)
+        {
+            auto cp = c8::utf8::codepoint(utf8);
+            auto unicode = cp.to_unicode();
+            auto block = c8::unicode::get_block(unicode);
+            codes.push_back({cp, get_cols(block, unicode)});
+            i += cp.codeunit_count();
+            utf8 += cp.codeunit_count();
+        }
+    }
+
+    void push(const std::string_view &src)
+    {
+        push((const char8_t *)src.data(), src.size());
+    }
+};
+
 class UnicodeGrid
 {
     //      0 1 2 ... D E F
     // 0000
     //  :
     // 4095
+
+    int m_plane = -1;
+    std::array<TermLine, 4096> m_lines;
+
 public:
     UnicodeGrid()
     {
+        SetPlane(0);
+    }
+
+    void SetPlane(int unicode_plane)
+    {
+        if (m_plane == unicode_plane)
+        {
+            return;
+        }
+        m_plane = unicode_plane;
+        for (int j = 0; j < 4096; ++j)
+        {
+            auto unicode_base = (unicode_plane << 16) | (j << 4);
+            auto block = c8::unicode::get_block(unicode_base);
+            auto &l = m_lines[j];
+            l.clear();
+            l.push(fmt::format((const char *)u8"{:04X}│", unicode_base));
+            for (int i = 0; i < 16; ++i)
+            {
+                auto unicode = unicode_base + i;
+                auto cp = c8::utf8::from_unicode(unicode);
+                auto cols = get_cols(block, unicode);
+                l.push(cp.data(), cols);
+                // padding
+                {
+                    switch (cols)
+                    {
+                    case -1:
+                    // {
+                    //     std::cout << ' ';
+                    //     break;
+                    // }
+                    case 0:
+                    {
+                        l.push("  ");
+                        break;
+                    }
+                    case 1:
+                    {
+                        l.push(" ");
+                        break;
+                    }
+                    case 2:
+                    {
+                        break;
+                    }
+                    default:
+                        assert(false);
+                        break;
+                    }
+                }
+                l.push(u8"│");
+            }
+            l.push(block.name);
+        }
+    }
+
+    tcb::span<TermCodepoint> GetLine(const TermPoint &p)
+    {
+        // TODO: p.x
+        return m_lines[p.y].codes;
+    }
+
+    void
+    RenderBlit(const TermcapEntryPtr &entry,
+               const std::function<tcb::span<TermCodepoint>(const TermPoint &)>
+                   &getLine,
+               const TermPoint &src, const TermSize &size, const TermPoint &dst)
+    {
+        for (int y = 0; y < size.height; ++y)
+        {
+            entry->cursor_xy(dst.x, dst.y + y);
+            auto line = getLine({src.x, src.y + y});
+            auto p = line.begin();
+            for (int x = 0; x < size.width && p != line.end(); ++p)
+            {
+                if (x + p->cols > size.width)
+                {
+                    // over eol
+                    break;
+                }
+                std::cout.write((const char *)p->cp.data(),
+                                p->cp.codeunit_count());
+                x += p->cols;
+            }
+            entry->clear_to_eol();
+        }
     }
 
     void RenderBlit(const TermcapEntryPtr &entry, char32_t plane,
-                    const TermCell &from, const TermRect &dst)
+                    const TermPoint &from, const TermRect &dst)
     {
         plane = plane << 16;
-        char32_t l = from.y << 4;
+        int l = from.y << 4;
         for (int y = 0; y < dst.height; ++y, l += 16)
         {
             if (l > 0xFFFF)
@@ -188,7 +365,8 @@ public:
             entry->cursor_xy(dst.left, dst.top + y);
             std::cout
                 /*<< "U+"*/
-                << std::hex << std::setw(4) << std::setfill('0') << l << "│";
+                // << std::hex << std::setw(4) << std::setfill('0') << l
+                << fmt::format("{:04X}", l) << "│";
 
             auto block = c8::unicode::get_block(line_unicode);
 
@@ -289,8 +467,12 @@ public:
 
     void Draw(int c = 0)
     {
-        m_grid->RenderBlit(m_entry, m_plane, {0, m_topline},
-                           {0, 1, m_cols, m_lines - 2});
+        m_grid->SetPlane(m_plane);
+
+        m_entry->cursor_show(false);
+        m_grid->RenderBlit(
+            m_entry, [g = m_grid](const TermPoint &p) { return g->GetLine(p); },
+            {0, m_topline}, {m_cols, m_lines - 2}, {0, 1});
 
         {
             m_entry->cursor_xy(0, 0);
@@ -311,6 +493,7 @@ public:
         }
 
         m_entry->cursor_xy(5 + m_col * 3, m_line + 1);
+        m_entry->cursor_show(true);
         std::cout.flush();
     }
 
@@ -386,7 +569,7 @@ public:
             m_line = height - 1;
         }
         m_col = std::clamp(m_col, 0, 16 - 1);
-        m_topline = std::clamp(m_topline, 0, 4096 - height - 1);
+        m_topline = std::clamp(m_topline, 0, 4096 - height);
         m_plane =
             std::clamp(m_plane, 0, (int)c8::unicode::UnicodePlanes::SPUA_B);
 

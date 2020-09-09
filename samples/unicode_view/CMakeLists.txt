@@ -6,5 +6,7 @@ target_link_libraries(${TARGET}
 PRIVATE
     termgrid
     asio
+    span
+    fmt
     char8
 )

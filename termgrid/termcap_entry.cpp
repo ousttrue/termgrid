@@ -49,6 +49,8 @@ struct TermcapEntryImpl
     std::string ae; /* alternative (graphic) charset end */
     std::string ac; /* graphics charset pairs */
     std::string op; /* set default color pair to its original value */
+    std::string vi;
+    std::string ve;
 
     TermcapEntryImpl(const char *term)
     {
@@ -104,6 +106,8 @@ struct TermcapEntryImpl
         ae = getstr("ae"); /* alternative (graphic) charset end */
         ac = getstr("ac"); /* graphics charset pairs */
         op = getstr("op"); /* set default color pair to its original value */
+        vi = getstr("vi");
+        ve = getstr("ve");
     }
 };
 
@@ -151,6 +155,18 @@ void TermcapEntry::cursor_save()
 void TermcapEntry::cursor_restore()
 {
     tputs(m_impl->rc.c_str(), 1, putchar);
+}
+
+void TermcapEntry::cursor_show(bool enable)
+{
+    if (enable)
+    {
+        tputs(m_impl->ve.c_str(), 1, putchar);
+    }
+    else
+    {
+        tputs(m_impl->vi.c_str(), 1, putchar);
+    }
 }
 
 void TermcapEntry::standout(bool enable)
