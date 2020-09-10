@@ -9,7 +9,7 @@ struct RawMode
     termios m_ioval;
     int m_tty;
 
-    RawMode(int tty);
+    RawMode(int tty = 0);
     ~RawMode();
 };
 

@@ -77,6 +77,11 @@ struct TermLine
 
     using GetColsFunc = const std::function<int(char32_t)>;
 
+    int push_empty()
+    {
+        return 0;
+    }
+
     // return cols
     int push(const GetColsFunc &get_cols, const char8_t *utf8, int size = -1)
     {

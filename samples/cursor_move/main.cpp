@@ -177,24 +177,12 @@ public:
 
 int main(int argc, char **argv)
 {
-    // open tty
-    if (!isatty(0))
+    auto entry = termgrid::TermcapEntry::create_from_env();
+    if(!entry)
     {
         return 1;
     }
-
-    auto term = getenv("TERM");
-    if (!term)
-    {
-        return 2;
-    }
-
-    auto entry = std::make_shared<termgrid::TermcapEntry>(term);
-    if (!entry)
-    {
-        return 3;
-    }
-
+    
     // main loop
     Asio asio(0);
     {

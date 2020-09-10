@@ -1,6 +1,9 @@
 #include "termcap_entry.h"
 #include <fcntl.h>
 #include <string>
+#include <unistd.h> // isatty
+#include <iostream>
+#include <thread>
 
 extern "C" int tgetent(const char *, const char *);
 extern "C" char *tgetstr(const char *, const char **);
@@ -124,6 +127,28 @@ TermcapEntry::~TermcapEntry()
     delete m_impl;
 }
 
+TermcapEntryPtr TermcapEntry::create_from_env()
+{
+    if (!isatty(0))
+    {
+        return nullptr;
+    }
+
+    auto term = getenv("TERM");
+    if (!term)
+    {
+        return nullptr;
+    }
+
+    auto entry = std::make_shared<termgrid::TermcapEntry>(term);
+    if (!entry)
+    {
+        return nullptr;
+    }
+
+    return entry;
+}
+
 void TermcapEntry::clear()
 {
     tputs(m_impl->cl.c_str(), 1, putchar);
@@ -182,6 +207,72 @@ void TermcapEntry::standout(bool enable)
     {
         tputs(m_impl->se.c_str(), 1, putchar);
     }
+}
+
+std::tuple<int, int> TermcapEntry::cursor_xy() const
+{
+    char buf[32] = {0};
+    std::thread t([&buf]() {
+        int i = 0;
+        for (; i < sizeof(buf); ++i)
+        {
+            char c;
+            if (!std::cin.get(c))
+            {
+                break;
+            }
+            buf[i] = c;
+            if (c == 'R')
+            {
+                ++i;
+                break;
+            }
+        }
+    });
+
+    std::string_view cmd = "\033[6n";
+    std::cout.write(cmd.data(), cmd.size());
+    std::cout.flush();
+
+    t.join();
+
+    auto p = buf;
+    if (*(p++) != '\033')
+        return {-1, -1};
+    if (*(p++) != '[')
+        return {-1, -1};
+
+    int line = 0;
+    for (; *p; ++p)
+    {
+        if (!isdigit(*p))
+        {
+            break;
+        }
+        line = line * 10 + *p - '0';
+    }
+
+    if (*(p++) != ';')
+    {
+        return {-1, -1};
+    }
+
+    int col = 0;
+    for (; *p; ++p)
+    {
+        if (!isdigit(*p))
+        {
+            break;
+        }
+        col = col * 10 + *p - '0';
+    }
+
+    if (*p != 'R')
+    {
+        return {-1, -1};
+    }
+
+    return {col - 1, line - 1};
 }
 
 } // namespace termgrid

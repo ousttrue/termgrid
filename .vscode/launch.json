@@ -1,48 +1,68 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "samples/cursor_move",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/samples/cursor_move/cursor_move",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
         {
-            "name": "samples/cursor_move",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/samples/cursor_move/cursor_move",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "miDebuggerPath": "/usr/bin/gdb"
-        },
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "samples/unicode_view",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/samples/unicode_view/unicode_view",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
         {
-          "name": "samples/unicode_view",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "${workspaceFolder}/build/samples/unicode_view/unicode_view",
-          "args": [],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [],
-          "externalConsole": false,
-          "MIMode": "gdb",
-          "setupCommands": [
-              {
-                  "description": "Enable pretty-printing for gdb",
-                  "text": "-enable-pretty-printing",
-                  "ignoreFailures": true
-              }
-          ],
-          "miDebuggerPath": "/usr/bin/gdb"
-      }
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "samples/wcwidth_from_cursor",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/samples/wcwidth_from_cursor/wcwidth_from_cursor",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
   ]
 }

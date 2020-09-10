@@ -92,7 +92,6 @@ public:
     }
 };
 
-
 static bool replace_space(char32_t unicode)
 {
     if (unicode <= 0x7F)
@@ -139,6 +138,7 @@ static int get_cols(char32_t unicode)
     case c8::unicode::UnicodeBlocks::DINGBATS:
     case c8::unicode::UnicodeBlocks::COPTIC:
     case c8::unicode::UnicodeBlocks::PRIVATE_USE_AREA:
+    case c8::unicode::UnicodeBlocks::YIJING_HEXAGRAM_SYMBOLS:
         return 1;
 
     case c8::unicode::UnicodeBlocks::TRANSPORT_AND_MAP_SYMBOLS:
@@ -182,10 +182,17 @@ public:
             auto block = c8::unicode::get_block(unicode_base);
             auto &l = m_lines[j];
             l.clear();
-            l.push(get_cols, fmt::format((const char *)u8"{:04X}│", unicode_base));
+            l.push(get_cols,
+                   fmt::format((const char *)u8"{:04X}│", unicode_base));
             for (int i = 0; i < 16; ++i)
             {
                 auto unicode = unicode_base + i;
+                if (unicode < 0x20 || (unicode >= 0x7F && unicode < 0xA0))
+                {
+                    l.push_empty();
+                    l.push(get_cols, u8"  │");
+                    continue;
+                }
                 auto cp = c8::utf8::from_unicode(unicode);
                 // auto cols = get_cols(unicode);
                 auto cols = l.push(get_cols, cp.data());
@@ -229,12 +236,13 @@ public:
         return m_lines[p.y].codes;
     }
 
-    using GetLineFunc = std::function<tcb::span<termgrid::TermCodepoint>(const termgrid::TermPoint &)>;
+    using GetLineFunc = std::function<tcb::span<termgrid::TermCodepoint>(
+        const termgrid::TermPoint &)>;
 
-    void
-    RenderBlit(const termgrid::TermcapEntryPtr &entry,
-               const GetLineFunc &getLine,
-               const termgrid::TermPoint &src, const termgrid::TermSize &size, const termgrid::TermPoint &dst)
+    void RenderBlit(const termgrid::TermcapEntryPtr &entry,
+                    const GetLineFunc &getLine, const termgrid::TermPoint &src,
+                    const termgrid::TermSize &size,
+                    const termgrid::TermPoint &dst)
     {
         for (int y = 0; y < size.height; ++y)
         {
@@ -299,9 +307,11 @@ public:
         m_grid->SetPlane(m_plane);
 
         m_entry->cursor_show(false);
-        m_grid->RenderBlit(
-            m_entry, [g = m_grid](const termgrid::TermPoint &p) { return g->GetLine(p); },
-            {0, m_topline}, {m_cols, m_lines - 2}, {0, 1});
+        m_grid->RenderBlit(m_entry,
+                           [g = m_grid](const termgrid::TermPoint &p) {
+                               return g->GetLine(p);
+                           },
+                           {0, m_topline}, {m_cols, m_lines - 2}, {0, 1});
 
         {
             m_entry->cursor_xy(0, 0);
@@ -410,22 +420,10 @@ public:
 
 int main(int argc, char **argv)
 {
-    // open tty
-    if (!isatty(0))
-    {
-        return 1;
-    }
-
-    auto term = getenv("TERM");
-    if (!term)
-    {
-        return 2;
-    }
-
-    auto entry = std::make_shared<termgrid::TermcapEntry>(term);
+    auto entry = termgrid::TermcapEntry::create_from_env();
     if (!entry)
     {
-        return 3;
+        return 1;
     }
 
     // main loop

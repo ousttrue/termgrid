@@ -34,4 +34,5 @@ subdirs(
     fmt
     samples/cursor_move
     samples/unicode_view
+    samples/wcwidth_from_cursor
 )
