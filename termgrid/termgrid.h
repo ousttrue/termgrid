@@ -1,6 +1,7 @@
 #pragma once
 #include <char8/char8.hpp>
 #include <functional>
+#include <tcb/span.hpp>
 
 namespace termgrid
 {
@@ -77,13 +78,8 @@ struct TermLine
 
     using GetColsFunc = const std::function<int(char32_t)>;
 
-    int push_empty()
-    {
-        return 0;
-    }
-
     // return cols
-    int push(const GetColsFunc &get_cols, const char8_t *utf8, int size = -1)
+    tcb::span<TermCodepoint> push(const char8_t *utf8, int size = -1)
     {
         if (size < 0)
         {
@@ -94,24 +90,28 @@ struct TermLine
             }
         }
 
-        int cols = 0;
+        auto before = codes.size();
         for (int i = 0; i < size;)
         {
             auto cp = c8::utf8::codepoint(utf8);
             auto unicode = cp.to_unicode();
-            auto c = get_cols(unicode);
-            codes.push_back({cp, c});
-            cols += c;
+            codes.push_back({cp});
             i += cp.codeunit_count();
             utf8 += cp.codeunit_count();
         }
-        return cols;
+
+        return tcb::span<TermCodepoint>(codes.data() + before,
+                                        codes.size() - before);
     }
 
-    // return cols
-    int push(const GetColsFunc &get_cols, const std::string_view &src)
+    tcb::span<TermCodepoint> push(const std::basic_string_view<char8_t> &src)
     {
-        return push(get_cols, (const char8_t *)src.data(), src.size());
+        return push(src.data(), src.size());
+    }
+
+    tcb::span<TermCodepoint> push(const std::string_view &src)
+    {
+        return push((const char8_t *)src.data(), src.size());
     }
 };
 

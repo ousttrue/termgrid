@@ -118,28 +118,17 @@ static bool replace_space(char32_t unicode)
 
 static int get_cols(char32_t unicode)
 {
+    if (unicode < 0x20 || (unicode >= 0x7F && unicode < 0xA0))
+    {
+        return 0;
+    }
+
     auto block = c8::unicode::get_block(unicode);
 
     switch ((c8::unicode::UnicodeBlocks)block.front)
     {
-    case c8::unicode::UnicodeBlocks::BASIC_LATIN:
-    case c8::unicode::UnicodeBlocks::LATIN_1_SUPPLEMENT:
-    case c8::unicode::UnicodeBlocks::LATIN_EXTENDED_A:
-    case c8::unicode::UnicodeBlocks::LATIN_EXTENDED_B:
-    case c8::unicode::UnicodeBlocks::IPA_EXTENSIONS:
-    case c8::unicode::UnicodeBlocks::SPACING_MODIFIER_LETTERS:
-    case c8::unicode::UnicodeBlocks::GREEK_AND_COPTIC:
-    case c8::unicode::UnicodeBlocks::CYRILLIC:
-    case c8::unicode::UnicodeBlocks::CYRILLIC_SUPPLEMENT:
-    case c8::unicode::UnicodeBlocks::ENCLOSED_ALPHANUMERICS:
-    case c8::unicode::UnicodeBlocks::BOX_DRAWING:
-    case c8::unicode::UnicodeBlocks::GEOMETRIC_SHAPES:
-    case c8::unicode::UnicodeBlocks::MISCELLANEOUS_SYMBOLS:
-    case c8::unicode::UnicodeBlocks::DINGBATS:
-    case c8::unicode::UnicodeBlocks::COPTIC:
-    case c8::unicode::UnicodeBlocks::PRIVATE_USE_AREA:
-    case c8::unicode::UnicodeBlocks::YIJING_HEXAGRAM_SYMBOLS:
-        return 1;
+    case c8::unicode::UnicodeBlocks::COMBINING_DIACRITICAL_MARKS:
+        return 0;
 
     case c8::unicode::UnicodeBlocks::TRANSPORT_AND_MAP_SYMBOLS:
     case c8::unicode::UnicodeBlocks::MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS:
@@ -147,10 +136,45 @@ static int get_cols(char32_t unicode)
     case c8::unicode::UnicodeBlocks::SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A:
     case c8::unicode::UnicodeBlocks::SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS:
         return 2;
+
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_E:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_F:
+    case c8::unicode::UnicodeBlocks::CJK_UNIFIED_IDEOGRAPHS_EXTENSION_G:
+    case c8::unicode::UnicodeBlocks::HANGUL_JAMO:
+    case c8::unicode::UnicodeBlocks::HANGUL_JAMO_EXTENDED_A:
+    case c8::unicode::UnicodeBlocks::HANGUL_JAMO_EXTENDED_B:
+    case c8::unicode::UnicodeBlocks::HANGUL_COMPATIBILITY_JAMO:
+    case c8::unicode::UnicodeBlocks::HANGUL_SYLLABLES:
+    case c8::unicode::UnicodeBlocks::CJK_RADICALS_SUPPLEMENT:
+    case c8::unicode::UnicodeBlocks::KANGXI_RADICALS:
+    case c8::unicode::UnicodeBlocks::ENCLOSED_CJK_LETTERS_AND_MONTHS:
+    case c8::unicode::UnicodeBlocks::CJK_COMPATIBILITY:
+    case c8::unicode::UnicodeBlocks::CJK_COMPATIBILITY_FORMS:
+    case c8::unicode::UnicodeBlocks::CJK_COMPATIBILITY_IDEOGRAPHS:
+    case c8::unicode::UnicodeBlocks::CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT:
+    case c8::unicode::UnicodeBlocks::HALFWIDTH_AND_FULLWIDTH_FORMS:
+    case c8::unicode::UnicodeBlocks::YI_RADICALS:
+    case c8::unicode::UnicodeBlocks::YI_SYLLABLES:
+    case c8::unicode::UnicodeBlocks::CJK_SYMBOLS_AND_PUNCTUATION:
+    case c8::unicode::UnicodeBlocks::HIRAGANA:
+    case c8::unicode::UnicodeBlocks::KATAKANA:
+    case c8::unicode::UnicodeBlocks::KATAKANA_PHONETIC_EXTENSIONS:
+    case c8::unicode::UnicodeBlocks::BOPOMOFO:
+    case c8::unicode::UnicodeBlocks::BOPOMOFO_EXTENDED:
+    case c8::unicode::UnicodeBlocks::CJK_STROKES:
+    case c8::unicode::UnicodeBlocks::IDEOGRAPHIC_DESCRIPTION_CHARACTERS:
+    case c8::unicode::UnicodeBlocks::KANBUN:
+
+        // CJK
+        return wcwidth_cjk(unicode);
     }
 
-    auto w = wcwidth_cjk(unicode);
-    return w;
+    return 1;
 }
 
 class UnicodeGrid
@@ -182,41 +206,38 @@ public:
             auto block = c8::unicode::get_block(unicode_base);
             auto &l = m_lines[j];
             l.clear();
-            l.push(get_cols,
-                   fmt::format((const char *)u8"{:04X}│", unicode_base));
+            l.push(fmt::format((const char *)u8"{:04X}│", unicode_base));
             for (int i = 0; i < 16; ++i)
             {
                 auto unicode = unicode_base + i;
-                if (unicode < 0x20 || (unicode >= 0x7F && unicode < 0xA0))
-                {
-                    l.push_empty();
-                    l.push(get_cols, u8"  │");
-                    continue;
-                }
+                auto cols = get_cols(unicode);
                 auto cp = c8::utf8::from_unicode(unicode);
                 // auto cols = get_cols(unicode);
-                auto cols = l.push(get_cols, cp.data());
                 // padding
                 {
                     switch (cols)
                     {
-                    case -1:
-                    // {
-                    //     std::cout << ' ';
-                    //     break;
-                    // }
                     case 0:
                     {
-                        l.push(get_cols, "  ");
+                        auto span = l.push(u8"  │");
+                        for (auto &c : span)
+                            c.cols = 1;
                         break;
                     }
                     case 1:
                     {
-                        l.push(get_cols, " ");
+                        l.push(cp.view())[0].cols = 1;
+                        auto span = l.push(u8" │");
+                        for (auto &c : span)
+                            c.cols = 1;
                         break;
                     }
                     case 2:
                     {
+                        l.push(cp.view())[0].cols = 2;
+                        auto span = l.push(u8"│");
+                        for (auto &c : span)
+                            c.cols = 1;
                         break;
                     }
                     default:
@@ -224,9 +245,8 @@ public:
                         break;
                     }
                 }
-                l.push(get_cols, u8"│");
             }
-            l.push(get_cols, block.name);
+            l.push(block.name);
         }
     }
 
