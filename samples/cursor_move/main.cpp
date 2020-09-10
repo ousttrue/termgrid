@@ -1,5 +1,4 @@
 #include <memory>
-// #include <string_view>
 #include <iostream>
 #include <sstream>
 #include <algorithm>
@@ -8,7 +7,6 @@
 #include <termcap_entry.h>
 
 using DispatchFunc = std::function<bool(int c)>;
-using TermcapEntryPtr = std::shared_ptr<TermcapEntry>;
 
 class Asio
 {
@@ -17,8 +15,8 @@ class Asio
     char byteArray[1];
     asio::signal_set signals;
 
-    RawMode rawmode;
-    TermcapEntryPtr m_entry;
+    termgrid::RawMode rawmode;
+    termgrid::TermcapEntryPtr m_entry;
 
 public:
     Asio(int tty)
@@ -88,13 +86,13 @@ public:
 
 class CursorMove
 {
-    TermcapEntryPtr m_entry;
+    termgrid::TermcapEntryPtr m_entry;
 
     int m_col = 0;
     int m_line = 0;
 
 public:
-    CursorMove(const TermcapEntryPtr &entry) : m_entry(entry)
+    CursorMove(const termgrid::TermcapEntryPtr &entry) : m_entry(entry)
     {
         // clear
         m_entry->clear();
@@ -191,7 +189,7 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    auto entry = std::make_shared<TermcapEntry>(term);
+    auto entry = std::make_shared<termgrid::TermcapEntry>(term);
     if (!entry)
     {
         return 3;

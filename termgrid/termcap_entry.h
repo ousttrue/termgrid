@@ -1,5 +1,7 @@
 #pragma once
+#include <memory>
 
+namespace termgrid {
 struct TermcapEntry
 {
     struct TermcapEntryImpl *m_impl;
@@ -20,3 +22,6 @@ struct TermcapEntry
     void cursor_show(bool enable);
     void standout(bool enable);
 };
+using TermcapEntryPtr = std::shared_ptr<termgrid::TermcapEntry>;
+
+}

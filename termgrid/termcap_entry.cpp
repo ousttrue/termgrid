@@ -19,6 +19,9 @@ static std::string_view getstr(const char *name)
     return func;
 }
 
+namespace termgrid
+{
+
 struct TermcapEntryImpl
 {
     std::string TERM;
@@ -180,3 +183,5 @@ void TermcapEntry::standout(bool enable)
         tputs(m_impl->se.c_str(), 1, putchar);
     }
 }
+
+} // namespace termgrid

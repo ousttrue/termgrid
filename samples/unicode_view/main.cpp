@@ -10,9 +10,9 @@
 #include <termcap_entry.h>
 #include <fmt/core.h>
 #include <tcb/span.hpp>
+#include <termgrid.h>
 
 using DispatchFunc = std::function<bool(int c)>;
-using TermcapEntryPtr = std::shared_ptr<TermcapEntry>;
 
 #include "../../_external/wcwidth-cjk/wcwidth.c"
 
@@ -23,8 +23,8 @@ class Asio
     char byteArray[1];
     asio::signal_set signals;
 
-    RawMode rawmode;
-    TermcapEntryPtr m_entry;
+    termgrid::RawMode rawmode;
+    termgrid::TermcapEntryPtr m_entry;
 
 public:
     Asio(int tty)
@@ -92,25 +92,6 @@ public:
     }
 };
 
-struct TermPoint
-{
-    int x;
-    int y;
-};
-
-struct TermSize
-{
-    int width;
-    int height;
-};
-
-struct TermRect
-{
-    int left;
-    int top;
-    int width;
-    int height;
-};
 
 static bool replace_space(char32_t unicode)
 {
@@ -136,8 +117,10 @@ static bool replace_space(char32_t unicode)
     return false;
 }
 
-static int get_cols(c8::unicode::UnicodeBlock &block, char32_t unicode)
+static int get_cols(char32_t unicode)
 {
+    auto block = c8::unicode::get_block(unicode);
+
     switch ((c8::unicode::UnicodeBlocks)block.front)
     {
     case c8::unicode::UnicodeBlocks::BASIC_LATIN:
@@ -170,84 +153,6 @@ static int get_cols(c8::unicode::UnicodeBlock &block, char32_t unicode)
     return w;
 }
 
-enum class TermColorTypes : uint8_t
-{
-    Ansi,
-    Color256,
-    Color24bit,
-};
-
-struct TermColor
-{
-    uint8_t r; // Color8 or Color256 or Color24bit red
-    uint8_t g;
-    uint8_t b;
-    TermColorTypes type;
-};
-static_assert(sizeof(TermColor) == 4, "TermColor.sizeof");
-
-/// TermCell にしようと思っていたが可変長になって表現できなかった
-///
-/// 1コードポイントで1cel: 半角文字
-/// 1コードポイントで2cel: 全角文字
-/// 1コードポイントで8cel: tab
-/// 2コードポイントで2cel: 漢字の異字体セレクタ
-/// 2コードポイントで2cel: 合字。濁点、半濁点を合成するやつ
-/// 2コードポイントで1cel: 合字。ウムラウトアクサンで合成するやつありそう
-/// Nコードポイントで2cel: 絵文字合成
-///
-/// span<TermCodepoint> で１文字(1Glyph、1 or 2
-/// columns)を表現する必要がありそう。 grapheme cluster
-///
-struct TermCodepoint
-{
-    // utf8 encoding codepoint
-    c8::utf8::codepoint cp;
-    /// 合字は最後のコードポイントで >0 にする
-    int cols;
-    /// standout, underline など Terminal のエフェクト
-    int flags;
-    TermColor fgcolor;
-    TermColor bgcolor;
-};
-
-struct TermLine
-{
-    std::vector<TermCodepoint> codes;
-
-    void clear()
-    {
-        codes.clear();
-    }
-
-    void push(const char8_t *utf8, int size = -1)
-    {
-        if (size < 0)
-        {
-            size = 0;
-            for (auto p = utf8; *p; ++p)
-            {
-                ++size;
-            }
-        }
-
-        for (int i = 0; i < size;)
-        {
-            auto cp = c8::utf8::codepoint(utf8);
-            auto unicode = cp.to_unicode();
-            auto block = c8::unicode::get_block(unicode);
-            codes.push_back({cp, get_cols(block, unicode)});
-            i += cp.codeunit_count();
-            utf8 += cp.codeunit_count();
-        }
-    }
-
-    void push(const std::string_view &src)
-    {
-        push((const char8_t *)src.data(), src.size());
-    }
-};
-
 class UnicodeGrid
 {
     //      0 1 2 ... D E F
@@ -256,7 +161,7 @@ class UnicodeGrid
     // 4095
 
     int m_plane = -1;
-    std::array<TermLine, 4096> m_lines;
+    std::array<termgrid::TermLine, 4096> m_lines;
 
 public:
     UnicodeGrid()
@@ -277,13 +182,13 @@ public:
             auto block = c8::unicode::get_block(unicode_base);
             auto &l = m_lines[j];
             l.clear();
-            l.push(fmt::format((const char *)u8"{:04X}│", unicode_base));
+            l.push(get_cols, fmt::format((const char *)u8"{:04X}│", unicode_base));
             for (int i = 0; i < 16; ++i)
             {
                 auto unicode = unicode_base + i;
                 auto cp = c8::utf8::from_unicode(unicode);
-                auto cols = get_cols(block, unicode);
-                l.push(cp.data(), cols);
+                // auto cols = get_cols(unicode);
+                auto cols = l.push(get_cols, cp.data());
                 // padding
                 {
                     switch (cols)
@@ -295,12 +200,12 @@ public:
                     // }
                     case 0:
                     {
-                        l.push("  ");
+                        l.push(get_cols, "  ");
                         break;
                     }
                     case 1:
                     {
-                        l.push(" ");
+                        l.push(get_cols, " ");
                         break;
                     }
                     case 2:
@@ -312,23 +217,24 @@ public:
                         break;
                     }
                 }
-                l.push(u8"│");
+                l.push(get_cols, u8"│");
             }
-            l.push(block.name);
+            l.push(get_cols, block.name);
         }
     }
 
-    tcb::span<TermCodepoint> GetLine(const TermPoint &p)
+    tcb::span<termgrid::TermCodepoint> GetLine(const termgrid::TermPoint &p)
     {
         // TODO: p.x
         return m_lines[p.y].codes;
     }
 
+    using GetLineFunc = std::function<tcb::span<termgrid::TermCodepoint>(const termgrid::TermPoint &)>;
+
     void
-    RenderBlit(const TermcapEntryPtr &entry,
-               const std::function<tcb::span<TermCodepoint>(const TermPoint &)>
-                   &getLine,
-               const TermPoint &src, const TermSize &size, const TermPoint &dst)
+    RenderBlit(const termgrid::TermcapEntryPtr &entry,
+               const GetLineFunc &getLine,
+               const termgrid::TermPoint &src, const termgrid::TermSize &size, const termgrid::TermPoint &dst)
     {
         for (int y = 0; y < size.height; ++y)
         {
@@ -349,89 +255,12 @@ public:
             entry->clear_to_eol();
         }
     }
-
-    void RenderBlit(const TermcapEntryPtr &entry, char32_t plane,
-                    const TermPoint &from, const TermRect &dst)
-    {
-        plane = plane << 16;
-        int l = from.y << 4;
-        for (int y = 0; y < dst.height; ++y, l += 16)
-        {
-            if (l > 0xFFFF)
-            {
-                break;
-            }
-            auto line_unicode = plane | l;
-            entry->cursor_xy(dst.left, dst.top + y);
-            std::cout
-                /*<< "U+"*/
-                // << std::hex << std::setw(4) << std::setfill('0') << l
-                << fmt::format("{:04X}", l) << "│";
-
-            auto block = c8::unicode::get_block(line_unicode);
-
-            auto x = 7;
-            for (int i = 0; i < 16; ++i)
-            {
-                char32_t unicode = line_unicode + i;
-                if (replace_space(unicode))
-                {
-                    unicode = 0x20;
-                }
-
-                auto w = get_cols(block, unicode);
-                if ((x + w) >= dst.width)
-                {
-                    // eol
-                    break;
-                }
-
-                auto cp = c8::utf8::from_unicode(unicode);
-                std::cout.write((const char *)cp.data(), cp.codeunit_count());
-                switch (w)
-                {
-                case -1:
-                // {
-                //     std::cout << ' ';
-                //     break;
-                // }
-                case 0:
-                {
-                    std::cout << "  ";
-                    break;
-                }
-                case 1:
-                {
-                    std::cout << ' ';
-                    break;
-                }
-                case 2:
-                {
-                    break;
-                }
-                default:
-                    assert(false);
-                    break;
-                }
-                std::cout << "│";
-                x += 3;
-            }
-
-            auto it = block.name.begin();
-            for (; x < dst.width && it != block.name.end(); ++x, ++it)
-            {
-                std::cout << *it;
-            }
-
-            entry->clear_to_eol();
-        }
-    }
 };
 using UnicodeGridPtr = std::shared_ptr<UnicodeGrid>;
 
 class UnicodeView
 {
-    TermcapEntryPtr m_entry;
+    termgrid::TermcapEntryPtr m_entry;
     UnicodeGridPtr m_grid;
 
     // unicode plane: 0..0x10
@@ -450,7 +279,7 @@ class UnicodeView
     int m_line = 0;
 
 public:
-    UnicodeView(const TermcapEntryPtr &entry)
+    UnicodeView(const termgrid::TermcapEntryPtr &entry)
         : m_entry(entry), m_grid(new UnicodeGrid)
     {
         m_cols = m_entry->columns();
@@ -471,7 +300,7 @@ public:
 
         m_entry->cursor_show(false);
         m_grid->RenderBlit(
-            m_entry, [g = m_grid](const TermPoint &p) { return g->GetLine(p); },
+            m_entry, [g = m_grid](const termgrid::TermPoint &p) { return g->GetLine(p); },
             {0, m_topline}, {m_cols, m_lines - 2}, {0, 1});
 
         {
@@ -593,7 +422,7 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    auto entry = std::make_shared<TermcapEntry>(term);
+    auto entry = std::make_shared<termgrid::TermcapEntry>(term);
     if (!entry)
     {
         return 3;

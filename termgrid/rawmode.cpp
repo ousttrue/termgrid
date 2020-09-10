@@ -1,6 +1,8 @@
 #include "rawmode.h"
 #include <errno.h>
 
+namespace termgrid {
+
 RawMode::RawMode(int tty) : m_tty(tty)
 {
     termios ioval;
@@ -34,4 +36,6 @@ RawMode::~RawMode()
             continue;
         break;
     }
+}
+
 }

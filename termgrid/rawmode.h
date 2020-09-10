@@ -1,6 +1,8 @@
 #pragma once
 #include <termios.h>
 
+namespace termgrid {
+
 struct RawMode
 {
     const int TTY_MODE = (ISIG | ICANON | ECHO | IEXTEN);
@@ -10,3 +12,5 @@ struct RawMode
     RawMode(int tty);
     ~RawMode();
 };
+
+}
