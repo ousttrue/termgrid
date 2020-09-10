@@ -27,12 +27,12 @@ keymap
 0070│p │q │r │s │t │u │v │w │x │y │z │{ │| │} │~ │  │Basic Latin
 0080│  │  │  │  │  │  │  │  │  │  │  │  │  │  │  │  │Latin-1 Supplement
 0090│  │  │  │  │  │  │  │  │  │  │  │  │  │  │  │  │Latin-1 Supplement
-00a0│  │¡ │¢ │£ │¤ │¥ │¦ │§ │¨ │© │ª │« │¬ │­ │® │¯ │Latin-1 Supplement
-00b0│° │± │² │³ │´ │µ │¶ │· │¸ │¹ │º │» │¼ │½ │¾ │¿ │Latin-1 Supplement
-00c0│À │Á │Â │Ã │Ä │Å │Æ │Ç │È │É │Ê │Ë │Ì │Í │Î │Ï │Latin-1 Supplement
-00d0│Ð │Ñ │Ò │Ó │Ô │Õ │Ö │× │Ø │Ù │Ú │Û │Ü │Ý │Þ │ß │Latin-1 Supplement
-00e0│à │á │â │ã │ä │å │æ │ç │è │é │ê │ë │ì │í │î │ï │Latin-1 Supplement
-00f0│ð │ñ │ò │ó │ô │õ │ö │÷ │ø │ù │ú │û │ü │ý │þ │ÿ │Latin-1 Supplement
+00A0│  │¡ │¢ │£ │¤ │¥ │¦ │§ │¨ │© │ª │« │¬ │­  │® │¯ │Latin-1 Supplement
+00B0│° │± │² │³ │´ │µ │¶ │· │¸ │¹ │º │» │¼ │½ │¾ │¿ │Latin-1 Supplement
+00C0│À │Á │Â │Ã │Ä │Å │Æ │Ç │È │É │Ê │Ë │Ì │Í │Î │Ï │Latin-1 Supplement
+00D0│Ð │Ñ │Ò │Ó │Ô │Õ │Ö │× │Ø │Ù │Ú │Û │Ü │Ý │Þ │ß │Latin-1 Supplement
+00E0│à │á │â │ã │ä │å │æ │ç │è │é │ê │ë │ì │í │î │ï │Latin-1 Supplement
+00F0│ð │ñ │ò │ó │ô │õ │ö │÷ │ø │ù │ú │û │ü │ý │þ │ÿ │Latin-1 Supplement
 0100│Ā │ā │Ă │ă │Ą │ą │Ć │ć │Ĉ │ĉ │Ċ │ċ │Č │č │Ď │ď │Latin Extended-A
 0110│Đ │đ │Ē │ē │Ĕ │ĕ │Ė │ė │Ę │ę │Ě │ě │Ĝ │ĝ │Ğ │ğ │Latin Extended-A
 0120│Ġ │ġ │Ģ │ģ │Ĥ │ĥ │Ħ │ħ │Ĩ │ĩ │Ī │ī │Ĭ │ĭ │Į │į │Latin Extended-A
@@ -42,7 +42,5 @@ keymap
 
 ## TODO
 
-* [ ] viewport
-* [ ] cursor interface
-* [ ] scroll interface
-* [ ] buffer / render to tputs
+* [ ] color
+* [ ] sixel
